@@ -4,11 +4,30 @@ using UnityEngine.InputSystem;
 
 public class GrabAndThrow : MonoBehaviour
 {
+    [Header("Interaction")]
     [SerializeField] private Transform holdPoint;
     [SerializeField] private float throwForce = 8f;
 
+    [Header("Animation")]
+    [SerializeField] private Animator animator;
+
     private GameObject nearbyObject;
     private GameObject heldObject;
+
+    private static readonly int GrabHash =
+        Animator.StringToHash("Grab");
+
+    private static readonly int ThrowHash =
+        Animator.StringToHash("Throw");
+
+    private static readonly int IsHoldingHash =
+        Animator.StringToHash("IsHolding");
+
+    private void Awake()
+    {
+        if (animator == null)
+            animator = GetComponentInChildren<Animator>(true);
+    }
 
     public void Interact(InputAction.CallbackContext context)
     {
@@ -16,16 +35,12 @@ public class GrabAndThrow : MonoBehaviour
             return;
 
         if (heldObject == null)
-        {
             PickUp();
-        }
         else
-        {
             Throw();
-        }
     }
 
-    void PickUp()
+    private void PickUp()
     {
         if (nearbyObject == null)
             return;
@@ -50,15 +65,34 @@ public class GrabAndThrow : MonoBehaviour
         heldObject.transform.SetParent(holdPoint);
         heldObject.transform.localPosition = Vector3.zero;
         heldObject.transform.localRotation = Quaternion.identity;
+
+        if (animator != null)
+        {
+            animator.SetBool(IsHoldingHash, true);
+            animator.ResetTrigger(ThrowHash);
+            animator.SetTrigger(GrabHash);
+        }
     }
 
-    void Throw()
+    private void Throw()
     {
-        heldObject.transform.SetParent(null);
+        if (heldObject == null)
+            return;
 
-        Rigidbody rb = heldObject.GetComponent<Rigidbody>();
+        GameObject objectToThrow = heldObject;
+        heldObject = null;
 
-        Collider col = heldObject.GetComponent<Collider>();
+        if (animator != null)
+        {
+            animator.SetBool(IsHoldingHash, false);
+            animator.ResetTrigger(GrabHash);
+            animator.SetTrigger(ThrowHash);
+        }
+
+        objectToThrow.transform.SetParent(null);
+
+        Rigidbody rb = objectToThrow.GetComponent<Rigidbody>();
+        Collider col = objectToThrow.GetComponent<Collider>();
 
         if (col != null)
             col.enabled = true;
@@ -71,22 +105,20 @@ public class GrabAndThrow : MonoBehaviour
                 ForceMode.Impulse
             );
         }
-
-        heldObject = null;
     }
 
-    void OnTriggerEnter(Collider other)
+    private void OnTriggerEnter(Collider other)
     {
-        if (other.CompareTag("PickUp"))
+        if (other.CompareTag("PickUp") ||
+            other.CompareTag("Crop"))
+        {
             nearbyObject = other.gameObject;
-        else if (other.CompareTag("Crop"))
-            nearbyObject = other.gameObject;
+        }
     }
 
-    void OnTriggerExit(Collider other)
+    private void OnTriggerExit(Collider other)
     {
         if (other.gameObject == nearbyObject)
             nearbyObject = null;
-        //Destroy(gameObject);
     }
 }
